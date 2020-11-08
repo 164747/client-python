@@ -2,7 +2,7 @@ import keyword
 from typing import List, Dict, Any
 
 from polygon.rest import models
-
+from pydantic import BaseModel
 
 class Definition:
     _swagger_name_to_python: Dict[str, str]
@@ -147,6 +147,53 @@ class LastQuote(Definition):
 
 
 # noinspection SpellCheckingInspection
+class HistTrade2(Definition):
+    _swagger_name_to_python = {
+        "condition1": "condition1",
+        "condition2": "condition2",
+        "condition3": "condition3",
+        "condition4": "condition4",
+        "exchange": "exchange",
+        "price": "price",
+        "size": "size",
+        "timestamp": "timestamp",
+
+    }
+
+    _attribute_is_primitive = {
+        "condition1": True,
+        "condition2": True,
+        "condition3": True,
+        "condition4": True,
+        "exchange": True,
+        "price": True,
+        "size": True,
+        "timestamp": True,
+
+    }
+
+    _attributes_to_types = {
+        "condition1": "int",
+        "condition2": "int",
+        "condition3": "int",
+        "condition4": "int",
+        "exchange": "str",
+        "price": "int",
+        "size": "int",
+        "timestamp": "str",
+
+    }
+
+    def __init__(self):
+        self.condition1: int
+        self.condition2: int
+        self.condition3: int
+        self.condition4: int
+        self.exchange: str
+        self.price: int
+        self.size: int
+        self.timestamp: str
+
 class HistTrade(Definition):
     _swagger_name_to_python = {
         "condition1": "condition1",
@@ -3038,7 +3085,6 @@ class StocksEquitiesLastQuoteForASymbolApiResponse(Definition):
         self.status: str
         self.symbol: str
         self.last: LastQuote
-
 
 # noinspection SpellCheckingInspection
 class StocksEquitiesDailyOpenCloseApiResponse(Definition):
