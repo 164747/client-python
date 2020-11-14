@@ -26,7 +26,6 @@ class PolygonModel(BaseModel):
         r = requests.Response = c._session.get(f"{c.url}{path}", params=params)
         if r.status_code == 200:
             d: dict = r.json()
-            print(d)
             # noinspection PyArgumentList
             return cls(**d)
         else:
@@ -77,7 +76,7 @@ class Bar(BaseModel):
     high: float = Field(alias='h')
     low: float = Field(alias='l')
     utc_window_start: datetime.datetime = Field(alias='t')
-    window_size: int = Field(alias='n')
+    trades: int = Field(alias='n')
 
 
 class TickerWindow(PolygonModel):
