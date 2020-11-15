@@ -11,6 +11,7 @@ from pydantic import BaseModel, Field
 import requests
 import functools
 import pandas as pd
+from dateutil.parser import parser
 
 _T = typing.TypeVar('_T')
 
@@ -20,7 +21,7 @@ class PolygonModel(BaseModel):
         client: RESTClient = None
 
     @classmethod
-    def _get(cls: PolygonModel, path: str, params:dict=None) -> PolygonModel:
+    def _get(cls: PolygonModel, path: str, params: dict = None) -> PolygonModel:
         c = PolygonModel.Meta.client
         assert c is not None
         r = requests.Response = c._session.get(f"{c.url}{path}", params=params)
@@ -86,12 +87,41 @@ class TickerWindow(PolygonModel):
     query_count: int = Field('queryCount')
     results: typing.List[Bar]
 
+    class __WindowSplitter(BaseModel):
+        from_: datetime.date
+        to: datetime.date
+        timespan: str
+
+        @property
+        def split_list(self) -> typing.List[typing.Tuple[str, str]]:
+            res = []
+            from_ = self.from_
+            while from_ <= self.to:
+                to = min(self.to, from_ + datetime.timedelta(days=5))
+                res.append((from_.isoformat(), to.isoformat()))
+                from_ = to + datetime.timedelta(days=1)
+            return res
+
     @classmethod
     def get(cls: TickerWindow, ticker: StockSymbol, timespan: str, from_: str, to: str, multiplier: int = 1,
             unadjusted: bool = False, sort: str = 'asc') -> TickerWindow:
-        return TickerWindow._get(f"/v2/aggs/ticker/{ticker}/range/{multiplier}/{timespan}/{from_}/{to}",
-                                 params=dict(sort=sort, unadjusted=unadjusted))
+        # noinspection PyTypeChecker
+        ws = TickerWindow.__WindowSplitter(**dict(from_=from_, to=to, timespan=timespan))
+        res = None
+        for (from_, to) in ws.split_list:
+            tmp = cls._get(f"/v2/aggs/ticker/{ticker}/range/{multiplier}/{timespan}/{from_}/{to}",
+                           params=dict(sort=sort, unadjusted=unadjusted))
+            if isinstance(res, TickerWindow):
+                res.append(tmp)
+            else:
+                res = tmp
+        return res
+
+    def append(self, other: TickerWindow):
+        self.query_count += other.query_count
+        self.results.extend(other.results)
 
     @property
     def df(self) -> pd.DataFrame:
-        return pd.DataFrame.from_dict(self.dict()['results'])
+        df = pd.DataFrame.from_dict(self.dict()['results'])
+        return df.set_index('utc_window_start').sort_index()
