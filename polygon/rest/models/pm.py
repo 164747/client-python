@@ -22,7 +22,7 @@ class PolygonModel(BaseModel):
     @classmethod
     def _get(cls: _T, path: str, params: dict = None) -> typing.Union[_T, typing.List[_T]]:
         c = PolygonModel.Meta.client
-        assert c is not None
+        # assert c is not None
         r = requests.Response = c._session.get(f"{c.url}{path}", params=params)
         if r.status_code == 200:
             d: typing.Union[dict, list] = r.json()
@@ -118,43 +118,23 @@ class Bar(BaseModel):
     trades: int = Field(alias='n', default=0)
 
 
+
+
 class TickerWindow(PolygonModel):
     symbol: StockSymbol = Field(alias='ticker')
     status: str
     adjusted: bool
-    query_count: int = Field('queryCount')
+    query_count: int = Field(alias='queryCount')
     results: typing.List[Bar]
-    _df : pd.DataFrame = Field(default_factory=pd.DataFrame)
 
-    class __WindowSplitter(BaseModel):
-        from_: datetime.date
-        to: datetime.date
-        timespan: str
-
-        @property
-        def split_list(self) -> typing.List[typing.Tuple[str, str]]:
-            res = []
-            from_ = self.from_
-            while from_ <= self.to:
-                to = min(self.to, from_ + datetime.timedelta(days=5))
-                res.append((from_.isoformat(), to.isoformat()))
-                from_ = to + datetime.timedelta(days=1)
-            return res
+    class Meta:
+        data_frames: typing.Dict[int, pd.DataFrame] = {}
 
     @classmethod
     def get(cls: TickerWindow, symbol: StockSymbol, timespan: str, from_: str, to: str, multiplier: int = 1,
             unadjusted: bool = False, sort: str = 'asc') -> TickerWindow:
-        # noinspection PyTypeChecker
-        ws = TickerWindow.__WindowSplitter(**dict(from_=from_, to=to, timespan=timespan))
-        res = None
-        for (from_, to) in ws.split_list:
-            tmp = cls._get(f"/v2/aggs/ticker/{symbol}/range/{multiplier}/{timespan}/{from_}/{to}",
-                           params=dict(sort=sort, unadjusted=unadjusted))
-            if isinstance(res, TickerWindow):
-                res.consume(tmp)
-            else:
-                res = tmp
-        return res
+        return cls._get(f"/v2/aggs/ticker/{symbol}/range/{multiplier}/{timespan}/{from_}/{to}",
+                        params=dict(sort=sort, unadjusted=unadjusted))
 
     def consume(self, other: TickerWindow):
         d_orig = {bar.utc_window_start: bar for bar in self.results}
@@ -163,23 +143,29 @@ class TickerWindow(PolygonModel):
         self.results = list(d_orig.values())
         self.results.sort(key=lambda x: x.utc_window_start)
         self.query_count = len(self.results)
-        _df : pd.DataFrame = Field(default_factory=pd.DataFrame)
+        self.__set_df()
+
+    def __set_df(self, df: pd.DataFrame = None):
+        self.Meta.data_frames[id(self)] = df
 
     @property
     def df(self) -> pd.DataFrame:
-        if len(self._df) == 0:
+        df = self.Meta.data_frames.get(id(self), None)
+        if df is None:
             df = pd.DataFrame.from_dict(self.dict()['results'])
-            self._df = df.set_index('utc_window_start').sort_index()
-        return self._df
+            df = df.set_index('utc_window_start').sort_index()
+            self.__set_df(df)
+        return df
 
-    def add_bar(self, bar : Bar):
+    def add_bar(self, bar: Bar):
         if len(self.results) == 0 or bar.utc_window_start > self.results[-1].utc_window_start:
             self.results.append(bar)
-            self._df = pd.DataFrame()
+            self.__set_df()
         elif bar.utc_window_start == self.results[-1].utc_window_start:
             self.results[-1] = bar
         else:
             raise NotImplementedError
+
 
 class TickerWindowFetcher(BaseModel):
     max_date: datetime.date = Field(default_factory=datetime.date.today)
@@ -188,7 +174,7 @@ class TickerWindowFetcher(BaseModel):
     symbol: StockSymbol
     adjusted: bool = True
 
-    def get_ticker_window(self, new_start_date: bool = True) -> TickerWindow:
+    def get_ticker_window(self, new_start_date: bool = False) -> TickerWindow:
         if new_start_date:
             self.max_date = datetime.date.today()
         max_date = self.max_date
@@ -205,4 +191,15 @@ class TickerWindowFetcher(BaseModel):
             else:
                 res.consume(tw)
             print(min_date, max_date, tmp)
+        assert res is not None
         return res
+
+
+def __main():
+    twf = TickerWindowFetcher(symbol='GOOG')
+    tw = twf.get_ticker_window()
+    print(tw.df)
+
+
+if __name__ == '__main__':
+    __main()

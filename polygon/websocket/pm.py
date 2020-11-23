@@ -36,6 +36,9 @@ class Quote(SocketBase):
     quote_conditions: int = Field(alias='c')
     utc: datetime.datetime = Field(alias='t')
 
+    def __str__(self):
+        return f'{self.bid_price} -- {self.ask_price}'
+
     @property
     def age(self) -> datetime.timedelta:
         return datetime.datetime.now(pytz.utc) - self.utc
@@ -60,8 +63,8 @@ class Bar(SocketBase):
     high_price : float = Field(alias='h')
     low_price : float = Field(alias='l')
     avg_prive : float = Field(alias='a')
-    utc_start : datetime.datetime = Field('s')
-    utc_end : datetime.datetime = Field('e')
+    utc_start : datetime.datetime = Field(alias='s')
+    utc_end : datetime.datetime = Field(alias='e')
 
     @property
     def rest_bar(self) -> pm.Bar:
