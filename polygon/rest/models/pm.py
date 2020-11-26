@@ -3,9 +3,6 @@ from __future__ import annotations
 import datetime
 import functools
 import typing
-import uuid
-from decimal import Decimal
-from enum import Enum
 from typing import List
 
 import pandas as pd
@@ -23,9 +20,9 @@ class PolygonModel(BaseModel):
         client: RESTClient = None
 
     @classmethod
-    def _get(cls: _T, path: str, params: dict = None) -> typing.Union[_T, typing.List[_T]]:
+    def api_action(cls: _T, path: str, params: dict = None) -> typing.Union[_T, typing.List[_T]]:
         c = PolygonModel.Meta.client
-        # assert c is not None
+        assert c is not None
         r = requests.Response = c._session.get(f"{c.url}{path}", params=params)
         if r.status_code == 200:
             d: typing.Union[dict, list] = r.json()
@@ -78,7 +75,7 @@ class TickerList(PolygonModel):
     def get(cls, market: str, search: str = None, active: str = 'true') -> TickerList:
         params = locals()
         params.pop('cls')
-        return TickerList._get(f"/v2/reference/tickers", params=params)
+        return TickerList.api_action(f"/v2/reference/tickers", params=params)
 
 
 class TickerDetail(PolygonModel):
@@ -108,7 +105,7 @@ class TickerDetail(PolygonModel):
     @classmethod
     @functools.lru_cache()
     def get(cls, symbol: str, **kwargs) -> TickerDetail:
-        return TickerDetail._get(f"/v1/meta/symbols/{symbol}/company")
+        return TickerDetail.api_action(f"/v1/meta/symbols/{symbol}/company")
 
 
 class Bar(BaseModel):
@@ -134,8 +131,8 @@ class TickerWindow(PolygonModel):
     @classmethod
     def get(cls: TickerWindow, symbol: StockSymbol, timespan: str, from_: str, to: str, multiplier: int = 1,
             unadjusted: bool = False, sort: str = 'asc') -> TickerWindow:
-        return cls._get(f"/v2/aggs/ticker/{symbol}/range/{multiplier}/{timespan}/{from_}/{to}",
-                        params=dict(sort=sort, unadjusted=unadjusted))
+        return cls.api_action(f"/v2/aggs/ticker/{symbol}/range/{multiplier}/{timespan}/{from_}/{to}",
+                              params=dict(sort=sort, unadjusted=unadjusted))
 
     def consume(self, other: TickerWindow):
         d_orig = {bar.utc_window_start: bar for bar in self.results}
@@ -196,70 +193,3 @@ class TickerWindowFetcher(BaseModel):
         return res
 
 
-class StopLoss(BaseModel):
-    stop_price: float
-    limit_price: float
-
-
-class OrderSide(Enum):
-    BUY = 'buy'
-    SELL = 'sell'
-
-
-class OrderTimeInFore(Enum):
-    DAY = 'day'
-
-
-class OrderType(Enum):
-    LIMIT = 'limit'
-
-
-class OrderClass(Enum):
-    SIMPLE = 'simple'
-
-
-class OrderBase(BaseModel):
-    client_order_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    qty: int
-    time_in_force: OrderTimeInFore = OrderTimeInFore.DAY
-    limit_price: typing.Optional[Decimal]
-    stop_price: typing.Optional[Decimal] = None
-
-
-class OrderReplace(OrderBase):
-    trail: typing.Optional[Decimal] = None
-
-
-class OrderPlace(OrderBase):
-    symbol: str
-    qty: int
-    order_type: str = Field(alias='type', default=OrderType.LIMIT)
-    side: OrderSide
-    time_in_force: OrderTimeInFore = OrderTimeInFore.DAY
-    limit_price: Decimal
-    stop_price: typing.Optional[Decimal] = None
-    extended_hours: bool = False
-    legs: typing.Optional[typing.List[Order]] = None
-    trail_price: typing.Optional[Decimal] = None
-    trail_percent: typing.Optional[Decimal] = None
-    order_class: OrderClass = OrderClass.SIMPLE
-    stop_loss: typing.Optional[StopLoss] = None
-
-
-class Order(OrderPlace):
-    order_id: str
-    created_at: datetime.datetime
-    submitted_at: typing.Optional[datetime.datetime] = None
-    filled_at: typing.Optional[datetime.datetime] = None
-    expired_at: typing.Optional[datetime.datetime] = None
-    cancelled_at: typing.Optional[datetime.datetime] = None
-    failed_at: typing.Optional[datetime.datetime] = None
-    replaced_at: typing.Optional[datetime.datetime] = None
-    replaced_by: typing.Optional[str] = None
-    replaces: typing.Optional[str] = None
-    asset_id: str
-    asset_class: str
-    filled_qty: int
-    status: str
-    legs: typing.Optional[typing.List[Order]] = None
-    hwm: Decimal
