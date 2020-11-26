@@ -3,6 +3,9 @@ from __future__ import annotations
 import datetime
 import functools
 import typing
+import uuid
+from decimal import Decimal
+from enum import Enum
 from typing import List
 
 import pandas as pd
@@ -118,8 +121,6 @@ class Bar(BaseModel):
     trades: int = Field(alias='n', default=0)
 
 
-
-
 class TickerWindow(PolygonModel):
     symbol: StockSymbol = Field(alias='ticker')
     status: str
@@ -195,11 +196,70 @@ class TickerWindowFetcher(BaseModel):
         return res
 
 
-def __main():
-    twf = TickerWindowFetcher(symbol='GOOG')
-    tw = twf.get_ticker_window()
-    print(tw.df)
+class StopLoss(BaseModel):
+    stop_price: float
+    limit_price: float
 
 
-if __name__ == '__main__':
-    __main()
+class OrderSide(Enum):
+    BUY = 'buy'
+    SELL = 'sell'
+
+
+class OrderTimeInFore(Enum):
+    DAY = 'day'
+
+
+class OrderType(Enum):
+    LIMIT = 'limit'
+
+
+class OrderClass(Enum):
+    SIMPLE = 'simple'
+
+
+class OrderBase(BaseModel):
+    client_order_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    qty: int
+    time_in_force: OrderTimeInFore = OrderTimeInFore.DAY
+    limit_price: typing.Optional[Decimal]
+    stop_price: typing.Optional[Decimal] = None
+
+
+class OrderReplace(OrderBase):
+    trail: typing.Optional[Decimal] = None
+
+
+class OrderPlace(OrderBase):
+    symbol: str
+    qty: int
+    order_type: str = Field(alias='type', default=OrderType.LIMIT)
+    side: OrderSide
+    time_in_force: OrderTimeInFore = OrderTimeInFore.DAY
+    limit_price: Decimal
+    stop_price: typing.Optional[Decimal] = None
+    extended_hours: bool = False
+    legs: typing.Optional[typing.List[Order]] = None
+    trail_price: typing.Optional[Decimal] = None
+    trail_percent: typing.Optional[Decimal] = None
+    order_class: OrderClass = OrderClass.SIMPLE
+    stop_loss: typing.Optional[StopLoss] = None
+
+
+class Order(OrderPlace):
+    order_id: str
+    created_at: datetime.datetime
+    submitted_at: typing.Optional[datetime.datetime] = None
+    filled_at: typing.Optional[datetime.datetime] = None
+    expired_at: typing.Optional[datetime.datetime] = None
+    cancelled_at: typing.Optional[datetime.datetime] = None
+    failed_at: typing.Optional[datetime.datetime] = None
+    replaced_at: typing.Optional[datetime.datetime] = None
+    replaced_by: typing.Optional[str] = None
+    replaces: typing.Optional[str] = None
+    asset_id: str
+    asset_class: str
+    filled_qty: int
+    status: str
+    legs: typing.Optional[typing.List[Order]] = None
+    hwm: Decimal
