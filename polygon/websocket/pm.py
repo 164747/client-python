@@ -1,12 +1,10 @@
-import time
-import typing
 import datetime
-from decimal import Decimal
-from enum import Enum
+import typing
 
 import pytz
-from polygon.rest.models import pm
 from pydantic import BaseModel, Field
+
+from polygon.rest.models import pm
 
 
 class SocketBase(BaseModel):
