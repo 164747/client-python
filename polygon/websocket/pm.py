@@ -33,7 +33,7 @@ class Quote(SocketBase):
     ask_exchange_id: int = Field(alias='ax')
     ask_price: float = Field(alias='ap')
     ask_size: int = Field(alias='as')
-    quote_conditions: int = Field(alias='c')
+    quote_conditions: typing.Optional[int] = Field(alias='c', default=None)
     utc: datetime.datetime = Field(alias='t')
 
     def __str__(self):

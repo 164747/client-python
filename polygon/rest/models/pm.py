@@ -7,7 +7,7 @@ from typing import List
 
 import pandas as pd
 import requests
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, root_validator
 
 from polygon import RESTClient
 
@@ -23,7 +23,9 @@ class PolygonModel(BaseModel):
     def api_action(cls: _T, path: str, params: dict = None) -> typing.Union[_T, typing.List[_T]]:
         c = PolygonModel.Meta.client
         assert c is not None
-        r = requests.Response = c._session.get(f"{c.url}{path}", params=params)
+        url = f"{c.url}{path}"
+        print(url)
+        r = requests.Response = c._session.get(url, params=params)
         if r.status_code == 200:
             d: typing.Union[dict, list] = r.json()
             if isinstance(d, list):
@@ -167,16 +169,25 @@ class TickerWindow(PolygonModel):
 
 class TickerWindowFetcher(BaseModel):
     max_date: datetime.date = Field(default_factory=datetime.date.today)
-    days_back: int = 5
+    min_date: typing.Optional[datetime.date] = Field(default=None)
+    days_back: typing.Optional[int] = None
     timespan: str = 'minute'
     symbol: StockSymbol
     adjusted: bool = True
+
+    @root_validator
+    def check_window_start(cls, values):
+        k1, k2 = 'min_date', 'days_back'
+        md, db = values.get(k1), values.get(k2)
+        if (md is None) is (db is None):
+            raise ValueError(f'precisely on of {k1} and {k2} must be set!')
+        return values
 
     def get_ticker_window(self, new_start_date: bool = False) -> TickerWindow:
         if new_start_date:
             self.max_date = datetime.date.today()
         max_date = self.max_date
-        min_date = max_date - datetime.timedelta(days=self.days_back)
+        min_date = self.min_date if self.min_date else max_date - datetime.timedelta(days=self.days_back)
         res = None
         tmp = max_date
         while min_date < tmp:
@@ -188,8 +199,5 @@ class TickerWindowFetcher(BaseModel):
                 res = tw
             else:
                 res.consume(tw)
-            print(min_date, max_date, tmp)
         assert res is not None
         return res
-
-
