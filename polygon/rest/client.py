@@ -5,7 +5,7 @@ class RESTClient:
     """ This is a custom generated class """
     DEFAULT_HOST = "api.polygon.io"
 
-    def __init__(self, auth_key: str, timeout: int=None):
+    def __init__(self, auth_key: str, timeout: int = None):
         self.auth_key = auth_key
         self.url = "https://" + self.DEFAULT_HOST
 
