@@ -9,8 +9,8 @@ class RESTClient:
         self.auth_key = auth_key
         self.url = "https://" + self.DEFAULT_HOST
 
-        self._session = requests.Session()
-        self._session.params["apiKey"] = self.auth_key
+        self.session = requests.Session()
+        self.session.params["apiKey"] = self.auth_key
         self.timeout = timeout
 
     def __enter__(self):
@@ -20,4 +20,4 @@ class RESTClient:
         self.close()
 
     def close(self):
-        self._session.close()
+        self.session.close()

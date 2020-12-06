@@ -25,7 +25,7 @@ class PolygonModel(BaseModel):
         assert c is not None
         url = f"{c.url}{path}"
         print(url)
-        r = requests.Response = c._session.get(url, params=params)
+        r = requests.Response = c.session.get(url, params=params)
         if r.status_code == 200:
             d: typing.Union[dict, list] = r.json()
             if isinstance(d, list):
