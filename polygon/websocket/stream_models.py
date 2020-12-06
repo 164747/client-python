@@ -4,7 +4,7 @@ import typing
 import pytz
 from pydantic import BaseModel, Field
 
-from polygon.rest.models import pm
+from polygon.rest import rest_models
 
 
 class SocketBase(BaseModel):
@@ -66,8 +66,8 @@ class Bar(SocketBase):
     utc_end: datetime.datetime = Field(alias='e')
 
     @property
-    def rest_bar(self) -> pm.Bar:
-        return pm.Bar(v=self.volume, o=self.open_price, c=self.close_price, h=self.high_price, l=self.low_price,
-                      t=self.utc_start, n=1)
+    def rest_bar(self) -> rest_models.Bar:
+        return rest_models.Bar(v=self.volume, o=self.open_price, c=self.close_price, h=self.high_price, l=self.low_price,
+                               t=self.utc_start, n=1)
 
 
