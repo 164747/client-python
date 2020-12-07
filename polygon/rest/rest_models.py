@@ -8,8 +8,9 @@ from typing import List
 import pandas as pd
 import requests
 from pydantic import BaseModel, Field, root_validator
-
+import logging
 from polygon import RESTClient
+logger = logging.getLogger(__name__)
 
 # _T = typing.TypeVar('_T')
 _T = typing.ClassVar
@@ -24,7 +25,7 @@ class PolygonModel(BaseModel):
         c = PolygonModel.Meta.client
         assert c is not None
         url = f"{c.url}{path}"
-        print(url)
+        logger.info(f'{url}')
         r = requests.Response = c.session.get(url, params=params)
         if r.status_code == 200:
             d: typing.Union[dict, list] = r.json()
