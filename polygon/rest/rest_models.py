@@ -95,8 +95,8 @@ class TickerDetail(PolygonModel):
     country: str
     industry: str
     sector: str
-    marketcap: float
-    employees: float
+    marketcap: typing.Optional[float] = None
+    employees: typing.Optional[float] = None
     phone: str
     ceo: str
     url: str
