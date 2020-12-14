@@ -7,9 +7,10 @@ from typing import List
 
 import pandas as pd
 import requests
-from pydantic import BaseModel, Field, root_validator
+from pydantic import BaseModel, Field, PrivateAttr, root_validator
 import logging
 from polygon import RESTClient
+
 logger = logging.getLogger(__name__)
 
 # _T = typing.TypeVar('_T')
@@ -202,3 +203,70 @@ class TickerWindowFetcher(BaseModel):
                 res.consume(tw)
         assert res is not None
         return res
+
+
+class TradeItem(BaseModel):
+    original_id: typing.Optional[int] = Field(alias='I', default=None)
+    exchange_id: typing.Optional[int] = Field(alias='x', default=None)
+    price: float = Field(alias='p')
+    correction_indicator: typing.Optional[int] = Field(alias='e', default=None)
+    reporting_id: typing.Optional[int] = Field(alias='r', default=None)
+    trade_time: datetime.datetime = Field(alias='t')
+    quote_time: typing.Optional[datetime.datetime] = Field(alias='y', default=None)
+    report_time: typing.Optional[datetime.datetime] = Field(alias='f', default=None)
+    sequence_no: typing.Optional[int] = Field(alias='q')
+    trade_conditions: typing.Optional[typing.List[int]] = Field(alias='c', default=None)
+    size: int = Field(alias='s')
+
+
+class Trade(PolygonModel):
+    symbol: str = Field(alias='ticker')
+    results_count: int
+    db_latency: int
+    success: bool
+    results: typing.List[TradeItem]
+    _df: typing.Optional[pd.DataFrame] = PrivateAttr(default=None)
+
+    @property
+    def df(self) -> pd.DataFrame:
+        if self._df is None:
+            df = pd.DataFrame.from_dict(self.dict()['results'])
+            # df = df.set_index('trade_time').sort_index()
+            self._df = df
+        return self._df
+
+    @classmethod
+    def __get(cls: Trade, symbol: str, date: str, timestamp_min: int = None, timestamp_max: int = None,
+              limit: int = 50000, reverse: bool = False) -> Trade:
+        return cls.api_action(f'/v2/ticks/stocks/trades/{symbol}/{date}',
+                              params=dict(timestamp=timestamp_min, timestampLimit=timestamp_max, limit=limit,
+                                          reverse=reverse))
+
+    @property
+    def size(self) -> int:
+        return len(self.results)
+
+    def consume(self, other: Trade):
+        assert self.results[-1].trade_time < other.results[0].trade_time
+        self.results_count += other.results_count
+        self.results.extend(other.results)
+
+    @staticmethod
+    def __n(dt: typing.Union[datetime.datetime, None]) -> typing.Union[int, None]:
+        if dt is None:
+            return None
+        else:
+            return int(dt.timestamp() * 1000)
+
+    @classmethod
+    def get(cls: Trade, symbol: str, date: str, timestamp_min: datetime.datetime = None,
+            timestamp_max: datetime.datetime = None, limit: int = 50000, reverse: bool = False) -> Trade:
+        use_limit = min(limit, 50000)
+        t_min = cls.__n(timestamp_min)
+        t_max = cls.__n(timestamp_max)
+        trade = tmp_trade = Trade.__get(symbol, date, t_min, t_max, min(limit, 50000), reverse=reverse)
+        while tmp_trade.size == use_limit and use_limit < limit:
+            t_min = cls.__n(trade.results[-1].trade_time)
+            tmp_trade = Trade.__get(symbol, date, t_min, t_max, use_limit, reverse=reverse)
+            trade.consume(tmp_trade)
+        return trade

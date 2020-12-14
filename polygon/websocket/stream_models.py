@@ -26,6 +26,11 @@ class Trade(SocketBase):
         return datetime.datetime.now(pytz.utc) - self.utc
 
 
+    @property
+    def trade_item(self) -> rest_models.TradeItem:
+        return rest_models.TradeItem(**self.dict())
+
+
 class Quote(SocketBase):
     bid_exchange_id: int = Field(alias='bx')
     bid_price: float = Field(alias='bp')
