@@ -161,6 +161,7 @@ class TickerWindow(PolygonModel):
 
     def add_bar(self, bar: Bar):
         if len(self.results) == 0 or bar.utc_window_start > self.results[-1].utc_window_start:
+            logger.info(f'Adding BAR {bar} to {self.symbol}')
             self.results.append(bar)
             self.__set_df()
         elif bar.utc_window_start == self.results[-1].utc_window_start:
