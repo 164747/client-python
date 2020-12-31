@@ -21,24 +21,30 @@ class PolygonModel(BaseModel):
     class Meta:
         client: RESTClient = None
 
+
     @classmethod
-    def api_action(cls: _T, path: str, params: dict = None) -> typing.Union[_T, typing.List[_T]]:
+    def api_action_raw(cls: _T, path: str, params: dict = None) -> typing.Union[dict, list, None]:
         c = PolygonModel.Meta.client
         assert c is not None
         url = f"{c.url}{path}"
         logger.info(f'{url}')
         r = requests.Response = c.session.get(url, params=params)
+        logger.info(f'{r.url} --> {r.status_code}')
         if r.status_code == 200:
-            d: typing.Union[dict, list] = r.json()
-            if isinstance(d, list):
-                # noinspection PyArgumentList
-                return [cls(**el) for el in d]
-            else:
-                # noinspection PyArgumentList
-                return cls(**d)
-
+            return r.json()
         else:
             r.raise_for_status()
+
+    @classmethod
+    def api_action(cls: _T, path: str, params: dict = None) -> typing.Union[_T, typing.List[_T]]:
+        d = cls.api_action_raw(path, params)
+        assert d is not None
+        if isinstance(d, list):
+            # noinspection PyArgumentList
+            return [cls(**el) for el in d]
+        else:
+            # noinspection PyArgumentList
+            return cls(**d)
 
     @classmethod
     def get(cls: _T, *args, **kwargs) -> typing.Union[_T, typing.List[_T]]:
@@ -238,36 +244,43 @@ class Trade(PolygonModel):
 
     @classmethod
     def __get(cls: Trade, symbol: str, date: str, timestamp_min: int = None, timestamp_max: int = None,
-              limit: int = 50000, reverse: bool = False) -> Trade:
-        return cls.api_action(f'/v2/ticks/stocks/trades/{symbol}/{date}',
+              limit: int = 50000, reverse: bool = False) -> typing.Tuple[Trade, int]:
+        d= cls.api_action_raw(f'/v2/ticks/stocks/trades/{symbol}/{date}',
                               params=dict(timestamp=timestamp_min, timestampLimit=timestamp_max, limit=limit,
                                           reverse=reverse))
+        trade = Trade(**d)
+        last= d['results'][-1]['t']
+        return trade, last
 
     @property
     def size(self) -> int:
         return len(self.results)
 
     def consume(self, other: Trade):
-        assert self.results[-1].trade_time < other.results[0].trade_time
-        self.results_count += other.results_count
-        self.results.extend(other.results)
+        #assert self.results[-1].trade_time > other.results[0].trade_time, (self.results[-1].trade_time, other.results[0].trade_time)
+        assert self.results[-1].trade_time == other.results[0].trade_time, (self.results[-1].trade_time, other.results[0].trade_time)
+        self.results_count += (other.results_count-1)
+        self.results.extend(other.results[1:])
+        self._df = None
 
     @staticmethod
     def __n(dt: typing.Union[datetime.datetime, None]) -> typing.Union[int, None]:
         if dt is None:
             return None
         else:
-            return int(dt.timestamp() * 1000)
+            return int(dt.timestamp() * 1e6)
 
     @classmethod
     def get(cls: Trade, symbol: str, date: str, timestamp_min: datetime.datetime = None,
-            timestamp_max: datetime.datetime = None, limit: int = 50000, reverse: bool = False) -> Trade:
+            timestamp_max: datetime.datetime = None, limit: int = 50000) -> Trade:
+        reverse = False
         use_limit = min(limit, 50000)
         t_min = cls.__n(timestamp_min)
         t_max = cls.__n(timestamp_max)
-        trade = tmp_trade = Trade.__get(symbol, date, t_min, t_max, min(limit, 50000), reverse=reverse)
+        tmp_trade,last = Trade.__get(symbol, date, t_min, t_max, use_limit, reverse=reverse)
+        trade = tmp_trade
         while tmp_trade.size == use_limit and use_limit < limit:
-            t_min = cls.__n(trade.results[-1].trade_time)
-            tmp_trade = Trade.__get(symbol, date, t_min, t_max, use_limit, reverse=reverse)
-            trade.consume(tmp_trade)
+            tmp_trade, last = Trade.__get(symbol, date, last, t_max, use_limit, reverse=reverse)
+            if len(tmp_trade.results) > 0:
+                trade.consume(tmp_trade)
         return trade
