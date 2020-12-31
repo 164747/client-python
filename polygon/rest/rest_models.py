@@ -272,9 +272,10 @@ class Trade(PolygonModel):
 
     @classmethod
     def get(cls: Trade, symbol: str, date: str, timestamp_min: datetime.datetime = None,
-            timestamp_max: datetime.datetime = None, limit: int = 50000) -> Trade:
-        reverse = False
+            timestamp_max: datetime.datetime = None, limit: int = 50000, reverse=False) -> Trade:
         use_limit = min(limit, 50000)
+        if reverse:
+            assert use_limit == limit
         t_min = cls.__n(timestamp_min)
         t_max = cls.__n(timestamp_max)
         tmp_trade,last = Trade.__get(symbol, date, t_min, t_max, use_limit, reverse=reverse)
