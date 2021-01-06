@@ -124,6 +124,7 @@ class Bar(BaseModel):
     close: float = Field(alias='c')
     high: float = Field(alias='h')
     low: float = Field(alias='l')
+    average: typing.Optional[float] = Field(alias='vw', default=None)
     utc_window_start: datetime.datetime = Field(alias='t')
     trades: int = Field(alias='n', default=0)
 
@@ -244,12 +245,13 @@ class Trade(PolygonModel):
 
     @classmethod
     def __get(cls: Trade, symbol: str, date: str, timestamp_min: int = None, timestamp_max: int = None,
-              limit: int = 50000, reverse: bool = False) -> typing.Tuple[Trade, int]:
+              limit: int = 50000, reverse: bool = False) -> typing.Tuple[Trade, typing.Union[int, None]]:
         d= cls.api_action_raw(f'/v2/ticks/stocks/trades/{symbol}/{date}',
                               params=dict(timestamp=timestamp_min, timestampLimit=timestamp_max, limit=limit,
                                           reverse=reverse))
         trade = Trade(**d)
-        last= d['results'][-1]['t']
+
+        last = None if len(trade.results) == 0 else d['results'][-1]['t']
         return trade, last
 
     @property
@@ -280,7 +282,7 @@ class Trade(PolygonModel):
         t_max = cls.__n(timestamp_max)
         tmp_trade,last = Trade.__get(symbol, date, t_min, t_max, use_limit, reverse=reverse)
         trade = tmp_trade
-        while tmp_trade.size == use_limit and use_limit < limit:
+        while isinstance(last, int) and tmp_trade.size == use_limit and use_limit < limit:
             tmp_trade, last = Trade.__get(symbol, date, last, t_max, use_limit, reverse=reverse)
             if len(tmp_trade.results) > 0:
                 trade.consume(tmp_trade)
