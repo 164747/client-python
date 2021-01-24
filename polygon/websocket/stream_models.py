@@ -32,17 +32,21 @@ class Trade(SocketBase):
 
 
 class Quote(SocketBase):
-    bid_exchange_id: int = Field(alias='bx')
-    bid_price: float = Field(alias='bp')
-    bid_size: int = Field(alias='bs')
-    ask_exchange_id: int = Field(alias='ax')
-    ask_price: float = Field(alias='ap')
-    ask_size: int = Field(alias='as')
+    bid_exchange_id: typing.Optional[int] = Field(alias='bx', default=None)
+    bid_price: typing.Optional[float] = Field(alias='bp', default=None)
+    bid_size: typing.Optional[int] = Field(alias='bs', default=None)
+    ask_exchange_id: typing.Optional[int] = Field(alias='ax', default=None)
+    ask_price: typing.Optional[float] = Field(alias='ap', default=None)
+    ask_size: typing.Optional[int] = Field(alias='as', default=None)
     quote_conditions: typing.Optional[int] = Field(alias='c', default=None)
     utc: datetime.datetime = Field(alias='t')
 
     def __str__(self):
         return f'{self.bid_size}:{self.bid_price} -- {self.ask_size}:{self.ask_price}'
+
+    @property
+    def is_complete(self) -> bool:
+        return self.bid_price is not None and self.ask_price is not None
 
     @property
     def age(self) -> datetime.timedelta:
